@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+
+import sys
+from diglet import Mkreq
+from diglet.enums import QType, ReturnCode, Type
+
+if __name__ == '__main__':
+    if len(sys.argv) < 2:
+        print('Usage: {} <domain> [<record type>+]', file=sys.stderr)
+        sys.exit(255)
+    name = sys.argv[1]
+    types = [QType[x] for x in sys.argv[2:]] if len(sys.argv) >= 3 else [QType.A]
+    for qt in types:
+        print('>>= {}'.format(qt.name))
+        res = Mkreq(name, qtype=qt)
+        if res['header']['rcode'] != ReturnCode.NO_ERROR:
+            print('; error: {}'.format(res['header']['rcode'].name), file=sys.stderr)
+            next
+        answers = res.get('answers', []) if qt.name != 'MX' else sorted(res.get('answers', []), key = lambda i: int(i['ardata']['preference']))
+        for ans in answers:
+            if ans['atype'] == Type.SOA:
+                print('{}\t{}\t{}\t{}\t{} {} {} {} {} {}'.format(
+                    ans['aname'],
+                    ans['attl'],
+                    ans['atype'].name,
+                    ans['aclass'].name,
+                    ans['ardata']['mname'],
+                    ans['ardata']['rname'],
+                    ans['ardata']['serial'],
+                    ans['ardata']['refresh'],
+                    ans['ardata']['retry'],
+                    ans['ardata']['expire'],
+                ))
+            elif ans['atype'] == Type.MX:
+                print('{}\t{}\t{}\t{}\t{:02d} {}'.format(
+                    ans['aname'],
+                    ans['attl'],
+                    ans['atype'].name,
+                    ans['aclass'].name,
+                    ans['ardata']['preference'],
+                    ans['ardata']['exchange'],
+                ))
+            else:
+                print('{}\t{}\t{}\t{}\t{}'.format(ans['aname'], ans['attl'], ans['atype'].name, ans['aclass'].name, ans['ardata']))
